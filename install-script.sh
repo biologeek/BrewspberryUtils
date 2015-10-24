@@ -22,7 +22,7 @@ RET_ABORT=64
 
 # ENV Variables  #
 
-TOMCAT_DIR=/opt/tomcat export TOMCAT_DIR
+TOMCAT_DIR=/opt/tomcat8 export TOMCAT_DIR
 JAVA_DIR=/usr/bin export JAVA_DIR
 
 JAVA_EXEC=$JAVA_DIR/java export JAVA_EXEC
@@ -38,7 +38,7 @@ JAVA7INSTALLER_PACKAGE=oracle-java7-installer
 
 # Tomcat vars #
 
-TOMCAT_URL=http://www.us.apache.org/dist/tomcat/tomcat-8/v8.0.27/bin/apache-tomcat-8.0.27.tar.gz
+TOMCAT_URL=http://wwwftp.ciril.fr/pub/apache/tomcat/tomcat-8/v8.0.28/bin/apache-tomcat-8.0.28.tar.gz
 
 
 
@@ -85,8 +85,29 @@ else
 		
 			1 )
 			
+				echo "** installing OpenJRE"
+				sudo apt-get install default-jre
+				if [ $? -eq 0 ]
+				then
+					echo "** installation of default-jre = SUCCES"
+					
+				else 
+					echo "** !!! installation failed. Exiting"
+					exit $RET_ABORT
+				fi
 			
-			;;
+				echo "** now installing OpenJDK"
+				sudo apt-get install default-jdk
+				if [ $? -eq 0 ]
+				then
+					echo "** installation of default-jdk = SUCCES"
+					
+				else 
+					echo "** !!! installation failed. Exiting"
+					exit $RET_ABORT
+				fi
+				echo "** Installation of Java finished"
+				;;
 			2 )
 				
 				
@@ -135,37 +156,48 @@ else
 		
 	esac
 	
-
-
-	###### As Java is not installed how could there be a server
-	read -p "Want to install a server (y/n) ?" ANS2
-
-	case $ANS2 in
-	
-		y ) 
-		
-		echo "Which one ?"
-		echo "1- Tomcat "
-		read -p "? " SERVER
-
-		case $SERVER in 
-
-			1 )
-	
-				cd /opt
-				sudo mkdir tomcat8
-				sudo chmod 775 -R tomcat8
-
-				cd tomcat8
-				wget $TOMCAT_URL
-				tar xzf apache-tomcat-8.0.27.tar.gz ../tomcat8
-
-				echo "export CATALINA_HOME=\"/opt/tomcat\"" >> ~/.bashrc
-				source ~/.bashrc
-
-				echo "Tomcat 8 install complete"
-
-			;;
-
-
 fi
+
+###### As Java is not installed how could there be a server
+read -p "Want to install a server (y/n) ?" ANS2
+
+case $ANS2 in
+
+	y ) 
+	
+	echo "Which one ?"
+	echo "1- Tomcat "
+	read -p "? " SERVER
+
+	case $SERVER in 
+
+		1 )
+			
+			sudo mkdir $TOMCAT_DIR
+			sudo chmod 775 -R $TOMCAT_DIR
+
+			cd $TOMCAT_DIR
+			wget $TOMCAT_URL
+			tar xzf $TOMCAT_DIR/apache-tomcat-8.0.27.tar.gz $TOMCAT_DIR
+
+			if [ $? -eq 0 ]
+			then
+				rm -f *$TOMCAT_DIR/apache-tomcat-8.0.27.tar.gz
+			else
+				echo "** !!! Error on untar command"
+
+			fi
+			echo "** Tomcat download complete !"
+
+			
+			echo "export CATALINA_HOME=\"/opt/tomcat\"" >> ~/.bashrc
+			source ~/.bashrc
+
+			echo "Tomcat 8 install complete"
+		
+		;;
+	esac
+	;;
+esac
+
+
