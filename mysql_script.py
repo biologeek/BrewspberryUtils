@@ -21,6 +21,8 @@ import logging
 import os.path
 import os
 import time
+from fileinput import filename
+from datetime import datetime
 
 propertiesFile = 'config.properties'
 properties = ConfigParser.ConfigParser()
@@ -37,9 +39,12 @@ SHOW_CREATE_TABLE_REQ = "SHOW CREATE TABLE"
 SELECT_ALL = "SELECT * FROM"
 
 FORMAT = '%(asctime)s - %(levelname)s : %(message)s'
-logging.basicConfig(format=FORMAT)
+LOG_FILE='/home/xavier/log/mysql_dump_trt_'+str(datetime.now()).replace(':','_')+'.log'
+
+os.popen('touch '+LOG_FILE)
+logging.basicConfig(filename=LOG_FILE, format=FORMAT)
 logger = logging.getLogger ("mysql dump")
-logger.setLevel(10)
+logger.setLevel(20)
 
 db_connection = None
 
@@ -105,14 +110,46 @@ def load_config () :
 
 
 
-def array_to_request_builder(stream, table_structure):
+def array_to_request_builder(stream):
 
-	string_builder = ''
-	for lines in stream:
+	
+	#	stream structure :
+	#
+	#	db1
+	#	|
+	#	-----table name str
+	#	|
+	#	-----table fields tuple
+	#	|	 |
+	#	|	 ------ table field
+	#	|	 |
+	#	|	 ------ ...
+	#	----- ...
+	
 		#For each line = each table
+	string_builder = ''
+	req = "INSERT INTO `"+str(stream[0])+"` VALUES "
+	logger.debug("parsing "+str(stream))
+	
 
-
-
+	for line in stream[1]:
+		req+="("
+		for field in line:
+			
+			if str(field).isdigit():
+				req+=str(field)+","
+			else:
+				req+="'"+str(field).replace("\'", "\\'")+"',"
+				
+	
+		
+		req = req[:-1]
+		req+="),"
+		
+	req=req[:-1]
+	logger.debug(req+")")
+	
+	return req+";"
 
 
 def populate_sql_file(db, listTupleDump, type):
@@ -128,12 +165,12 @@ def populate_sql_file(db, listTupleDump, type):
 
 
 
-			headerMsg ="""---------------------------------------------\n
-							-- MySQL dump script by Spaulding -----------\n
-							---------------------------------------------\n
-							-- Database : '+db+'\n
-							-- Host : '+server_ip+'\n
-							---------------------------------------------\n"""
+			headerMsg ="""#---------------------------------------------\n
+							#-- MySQL dump script by Spaulding -----------\n
+							#---------------------------------------------\n
+							#-- Database : """+db+"""\n
+							#-- Host : """+server_ip+"""\n
+							#---------------------------------------------\n"""
 
 			logger.info(str(len (listTupleDump))+' tables to insert')
 			
@@ -148,7 +185,7 @@ def populate_sql_file(db, listTupleDump, type):
 					dump_file.write(headerMsg)
 
 					for i in range(0, len(listTupleDump)):
-						logger.debug('Writing %s', listTupleDump[i][1])
+						#logger.debug('Writing %s', listTupleDump[i][1])
 
 						dump_file.write(str(listTupleDump[i][1])+'\n;\n\n')
 
@@ -164,15 +201,22 @@ def populate_sql_file(db, listTupleDump, type):
 					logger.debug('Log : '+dump_folder+'/tbl_data/tbl_data'+db+'_'+time.strftime("%Y-%m-%d %H:%M:%S")+'.sql')
 					dump_file = open(dump_folder+'/tbl_data/tbl_data'+db+'_'+time.strftime("%Y-%m-%d %H:%M:%S")+'.sql', 'w')
 
-
-					print "******************************"
-					print listTupleDump
-					print "******************************"
 					dump_file.write(headerMsg)
-
-					logger.debug('Writing line %s', listTupleDump)
-					dump_file.write(listTupleDump[1])
-
+					
+					
+					print listTupleDump
+					  
+					#logger.debug('Writing line %s', listTupleDump[0])
+					logger.debug(array_to_request_builder(listTupleDump))
+					
+					for table in listTupleDump :
+						if (len(table[1]) > 0):
+							
+							dump_file.write("\n\n\n#-- Table "+table[0]+"\n\n\n")
+							dump_file.write(array_to_request_builder(table))
+						
+						else:
+							logger.info("No entry in this table")
 
 					dump_file.close()
 
@@ -210,14 +254,12 @@ def main() :
 
 		for database in databases :
 
-			print "Config loaded, trying to connect to server "+server_ip+" with user "+root_user
-			print "..."
+			logger.info("Config loaded, trying to connect to server "+server_ip+" with user "+root_user)
+			logger.info("...")
 
 			if connect_to_server(database) == 0 :
 				
-				print "Connected to "+str(server_ip)+" : "+str(database)
-
-				print database
+				logger.info("Connected to "+str(server_ip)+" : "+str(database))
 
 				#ready = raw_input("Ready to dump ? (y/n)")
 
@@ -225,8 +267,7 @@ def main() :
 
 				#Looping over databases
 				for database in databases :
-					print "Working on database : "+str(database)+" ..."
-					print "Saving tables :"
+					logger.info("Saving tables :")
 					cursor = db_connection.cursor()
 
 					cursor.execute(SHOW_TABLE_REQ)
@@ -257,10 +298,10 @@ def main() :
 
 						table_data = cursor.fetchall()
 
-						data_dump.append((table,table_data))
+						data_dump.append((table[0],table_data))
 
 
-
+					logger.info("Populating files for db="+database)
 					populate_sql_file(database, database_dump, 1)
 					populate_sql_file(database, data_dump, 2)
 
